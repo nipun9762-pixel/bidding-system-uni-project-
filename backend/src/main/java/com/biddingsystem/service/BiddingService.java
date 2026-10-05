@@ -49,6 +49,28 @@ public class BiddingService {
         bidValidationStrategy.validateBidder(bidder);
         BigDecimal minRequiredBid = bidValidationStrategy.calculateMinimumRequiredBid(auction);
         bidValidationStrategy.validateBidAmount(bidAmount, minRequiredBid);
+        // 2. Mark previous highest bid as OUTBID
+        List<Bid> existingBids = bidRepo.findByAuctionListing_AuctionIdOrderByBidAmountDesc(auctionId);
+        Optional<Bid> prevHighestOpt = Optional.empty();
+        if (!existingBids.isEmpty()) {
+            Bid prevHighest = existingBids.get(0);
+            prevHighest.setBidStatus(Bid.BidStatus.OUTBID);
+            bidRepo.save(prevHighest);
+            prevHighestOpt = Optional.of(prevHighest);
+        }
 
+        // 3. Save New Bid & Update Auction Current Highest Bid
+        Bid newBid = new Bid(auction, bidder, bidAmount, Bid.BidStatus.ACCEPTED);
+        Bid savedBid = bidRepo.save(newBid);
+
+        auction.setCurrentHighestBid(bidAmount);
+        auctionRepo.save(auction);
+
+        // 4. Observer Pattern: Decouple notifications and audit logging by publishing domain event
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new BidPlacedEvent(this, savedBid, prevHighestOpt, auction));
+        }
+
+        return savedBid;
     }
 }
