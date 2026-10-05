@@ -32,5 +32,23 @@ public class BiddingService {
     // Observer Pattern: Spring ApplicationEventPublisher to broadcast domain events
     @Autowired(required = false)
     private ApplicationEventPublisher eventPublisher;
+    @Transactional
+    public Bid placeBid(Long auctionId, Long bidderId, BigDecimal bidAmount) {
+        AuctionListing auction = auctionRepo.findById(auctionId)
+                .orElseThrow(() -> new IllegalArgumentException("Auction listing not found: " + auctionId));
 
+        User bidder = userRepo.findById(bidderId)
+                .orElseThrow(() -> new IllegalArgumentException("Bidder user not found: " + bidderId));
+
+        if (bidValidationStrategy == null) {
+            bidValidationStrategy = new com.biddingsystem.pattern.strategy.bidding.StandardBidValidationStrategy();
+        }
+
+        // 1. Strategy Pattern: Delegate domain rule validation and min increment calculation
+        bidValidationStrategy.validateAuctionStatus(auction);
+        bidValidationStrategy.validateBidder(bidder);
+        BigDecimal minRequiredBid = bidValidationStrategy.calculateMinimumRequiredBid(auction);
+        bidValidationStrategy.validateBidAmount(bidAmount, minRequiredBid);
+
+    }
 }
