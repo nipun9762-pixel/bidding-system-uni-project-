@@ -21,5 +21,19 @@ public class BidController {
 
     @Autowired
     private BidRepository bidRepo;
+    @PostMapping("/place")
+    public ResponseEntity<?> placeBid(@RequestBody Map<String, Object> payload) {
+        try {
+            Long auctionId = Long.parseLong(payload.get("auctionId").toString());
+            Long bidderId = Long.parseLong(payload.get("bidderId").toString());
+            BigDecimal bidAmount = new BigDecimal(payload.get("bidAmount").toString());
 
+            Bid placedBid = biddingService.placeBid(auctionId, bidderId, bidAmount);
+            return ResponseEntity.ok(placedBid);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Internal server error: " + e.getMessage()));
+        }
+    }
 }
