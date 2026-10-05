@@ -36,4 +36,8 @@ public class BidController {
             return ResponseEntity.internalServerError().body(Map.of("error", "Internal server error: " + e.getMessage()));
         }
     }
+        @GetMapping("/auction/{auctionId}")
+    public List<Bid> getBidsForAuction(@PathVariable Long auctionId) {
+        return bidRepo.findByAuctionListing_AuctionIdOrderByBidAmountDesc(auctionId);
+    }
 }
