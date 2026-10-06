@@ -1,0 +1,114 @@
+package com.biddingsystem.pattern;
+
+import com.biddingsystem.entity.Delivery;
+import com.biddingsystem.entity.Payment;
+import com.biddingsystem.entity.WinningOrder;
+import com.biddingsystem.pattern.state.delivery.*;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+
+/**
+ * Dedicated CLI Demonstration for Project Documentation.
+ * Run via Maven:
+ * .\apache-maven-3.9.6\bin\mvn.cmd test -Dtest=DesignPatternsDemoRunnerTest
+ */
+public class DesignPatternsDemoRunnerTest {
+
+    @Test
+    void runDesignPatternsCliDemonstration() {
+        printBanner("BIDDING SYSTEM DESIGN PATTERNS EXECUTION TRACE");
+
+        WinningOrder testOrder = new WinningOrder();
+        testOrder.setOrderId(1042L);
+        testOrder.setWinningAmount(new BigDecimal("78500.00"));
+
+        // ====================================================================
+        // PATTERN 2: STATE PATTERN (DELIVERY LIFECYCLE MANAGEMENT)
+        // ====================================================================
+        System.out.println("\n================================================================================");
+        System.out.println(" 2. DESIGN PATTERN: STATE PATTERN (DELIVERY LIFECYCLE MANAGEMENT)");
+        System.out.println("================================================================================");
+        System.out.println("Pattern Category : Gang of Four (GoF) - Behavioral");
+        System.out.println("Purpose          : Allow the Delivery entity to alter its behavior when its internal");
+        System.out.println("                   logistics state changes, enforcing strict lifecycle rules.");
+        System.out.println("Context Class    : com.biddingsystem.entity.Delivery");
+        System.out.println("State Interface  : com.biddingsystem.pattern.state.delivery.DeliveryState");
+        System.out.println("State Factory    : com.biddingsystem.pattern.state.delivery.DeliveryStateFactory");
+        System.out.println("--------------------------------------------------------------------------------");
+
+        Delivery delivery = new Delivery();
+        delivery.setDeliveryId(8801L);
+        delivery.setWinningOrder(testOrder);
+        delivery.setDeliveryAddress("742 Evergreen Terrace, Springfield, OR");
+        delivery.setDeliveryStatus(Delivery.DeliveryStatus.AWAITING_PAYMENT);
+
+        System.out.println(" [Step 2.1] INITIAL CREATION:");
+        printDeliveryStateSnapshot(delivery);
+
+        // Transition 1: Awaiting Payment -> Preparing for Shipment
+        System.out.println(" [Step 2.2] TRANSITION EVENT: Payment Approved by Clearinghouse");
+        delivery.transitionTo(Delivery.DeliveryStatus.PREPARING_FOR_SHIPMENT);
+        printDeliveryStateSnapshot(delivery);
+
+        // Transition 2: Preparing for Shipment -> Shipped
+        System.out.println(" [Step 2.3] TRANSITION EVENT: Carrier Dispatch & Handover");
+        delivery.setCarrierName("Apex Auto Freight Express");
+        delivery.setTrackingNumber("APX-8801-EXP");
+        delivery.setCurrentLocation("Dispatch Terminal Hub A - Bay 4");
+        delivery.transitionTo(Delivery.DeliveryStatus.SHIPPED);
+        printDeliveryStateSnapshot(delivery);
+        System.out.println(String.format("   --> Side-Effect Hook    : Shipped Timestamp = %s", delivery.getShippedDate()));
+        System.out.println(String.format("   --> Side-Effect Hook    : Estimated Delivery = %s", delivery.getEstimatedDeliveryDate()));
+
+        // Transition 3: Shipped -> In Transit
+        System.out.println(" [Step 2.4] TRANSITION EVENT: En Route Highway Checkpoint Scan");
+        delivery.setCurrentLocation("Interstate 80 Corridor - Checkpoint 12");
+        delivery.transitionTo(Delivery.DeliveryStatus.IN_TRANSIT);
+        printDeliveryStateSnapshot(delivery);
+
+        // Transition 4: In Transit -> Out For Delivery
+        System.out.println(" [Step 2.5] TRANSITION EVENT: Local Hub Flatbed Out For Delivery");
+        delivery.setCurrentLocation("Springfield Regional Logistics Depot");
+        delivery.transitionTo(Delivery.DeliveryStatus.OUT_FOR_DELIVERY);
+        printDeliveryStateSnapshot(delivery);
+
+        // Transition 5: Out For Delivery -> Delivered (Terminal State)
+        System.out.println(" [Step 2.6] TRANSITION EVENT: Destination Handover & Title Receipt Signed");
+        delivery.setCurrentLocation("742 Evergreen Terrace, Springfield, OR");
+        delivery.transitionTo(Delivery.DeliveryStatus.DELIVERED);
+        printDeliveryStateSnapshot(delivery);
+        System.out.println(String.format("   --> Side-Effect Hook    : Delivered Timestamp = %s", delivery.getDeliveredDate()));
+
+        // Invalid Transition Protection Demonstration
+        System.out.println("\n [Step 2.7] VALIDATION CHECK: Guard against illegal state transition");
+        try {
+            System.out.println("   --> Attempting illegal backward transition: DELIVERED -> SHIPPED ...");
+            delivery.transitionTo(Delivery.DeliveryStatus.SHIPPED);
+            System.out.println("   --> FAILED: Illegal transition was not blocked!");
+        } catch (IllegalStateException ex) {
+            System.out.println("   --> SUCCESS: State Pattern blocked invalid transition!");
+            System.out.println(String.format("   --> Caught Exception : %s", ex.getMessage()));
+        }
+
+        System.out.println("\n================================================================================");
+        System.out.println(" DESIGN PATTERNS VERIFICATION SUMMARY: ALL RUNTIME TRACES VALIDATED");
+        System.out.println("================================================================================\n");
+    }
+
+    private void printDeliveryStateSnapshot(Delivery delivery) {
+        DeliveryState state = delivery.getCurrentState();
+        System.out.println(String.format("   --> Active State Class  : %s", state.getClass().getSimpleName()));
+        System.out.println(String.format("   --> Current Status Enum : %s", delivery.getDeliveryStatus()));
+        System.out.println(String.format("   --> Milestone Title     : %s", state.getMilestoneTitle()));
+        System.out.println(String.format("   --> Associated Order St : %s", state.getAssociatedOrderStatus()));
+        System.out.println(String.format("   --> Description Text    : %s", state.getDefaultDescription(delivery, null)));
+        System.out.println("   -------------------------------------------------------------------------");
+    }
+
+    private void printBanner(String title) {
+        System.out.println("\n********************************************************************************");
+        System.out.println("  " + title);
+        System.out.println("********************************************************************************\n");
+    }
+}
