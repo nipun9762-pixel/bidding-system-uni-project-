@@ -7,3 +7,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "bid")
 public class Bid {
+   @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long bidId;
