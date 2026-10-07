@@ -1,0 +1,34 @@
+# Dependencies
+frontend/node_modules/
+node_modules/
+
+# Production build outputs
+frontend/dist/
+dist/
+
+# Java / Maven build outputs
+backend/target/
+target/
+*.class
+apache-maven*/
+backend/apache-maven*/
+*.timestamp-*.mjs
+*.mjs.map
+
+# IDE and editors
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+
+# Environment and logs
+*.log
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
