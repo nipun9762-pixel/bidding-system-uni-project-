@@ -33,6 +33,9 @@ public class Payment {
     private String paymentSlipUrl;
 
     @Column(columnDefinition = "TEXT")
+    private String paymentDetails;
+
+    @Column(columnDefinition = "TEXT")
     private String adminNotes;
 
     public enum PaymentStatus {
@@ -64,6 +67,9 @@ public class Payment {
 
     public String getPaymentSlipUrl() { return paymentSlipUrl; }
     public void setPaymentSlipUrl(String paymentSlipUrl) { this.paymentSlipUrl = paymentSlipUrl; }
+
+    public String getPaymentDetails() { return paymentDetails; }
+    public void setPaymentDetails(String paymentDetails) { this.paymentDetails = paymentDetails; }
 
     public String getAdminNotes() { return adminNotes; }
     public void setAdminNotes(String adminNotes) { this.adminNotes = adminNotes; }

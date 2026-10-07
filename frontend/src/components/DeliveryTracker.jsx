@@ -1017,54 +1017,52 @@ export default function DeliveryTracker({
                     <ShieldCheck className="w-4 h-4 text-emerald-600" /> Winning Buyer Portal
                   </h4>
 
-                  {/* If Awaiting Payment or Slip Pending */}
+                  {/* If Awaiting Payment or Approval Pending */}
                   {currentStageIndex === 0 && (
                     <>
-                      {((activeOrder?.orderStatus === 'PROCESSING' || activeOrder?.payment?.paymentStatus === 'PROCESSING') && (activeOrder?.payment?.paymentSlipUrl || activeOrder?.paymentSlipUrl)) ? (
+                      {(activeOrder?.orderStatus === 'PROCESSING' || activeOrder?.payment?.paymentStatus === 'PROCESSING') ? (
                         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs space-y-2">
                           <div className="flex items-center gap-1.5 font-bold text-amber-900">
                             <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                            <span>Payment Slip Uploaded</span>
+                            <span>Payment Submitted — Awaiting Administrator Approval</span>
                           </div>
                           <p className="text-[11px] text-amber-800 leading-relaxed">
-                            Your bank deposit slip has been submitted and is currently awaiting <strong>Administrator Verification</strong>. Once approved, vehicle preparation and delivery tracking will begin immediately.
+                            Your payment has been logged and is currently awaiting <strong>Administrator Review & Approval</strong>. Once accepted, vehicle preparation and delivery tracking will begin immediately.
                           </p>
-                          {(activeOrder?.payment?.paymentSlipUrl || activeOrder?.paymentSlipUrl) && (
-                            <div className="rounded-lg overflow-hidden border border-amber-200 bg-slate-900 h-28 flex items-center justify-center p-1">
-                              <img 
-                                src={activeOrder?.payment?.paymentSlipUrl || activeOrder?.paymentSlipUrl} 
-                                alt="Bank Deposit Slip" 
-                                className="max-h-full object-contain" 
-                              />
-                            </div>
-                          )}
+                          <div className="bg-white/80 border border-amber-200/60 rounded-lg p-2 font-mono text-[11px] text-slate-700 space-y-0.5">
+                            <div>Method: <strong className="font-sans text-slate-900">{activeOrder?.payment?.paymentMethod === 'BANK_TRANSFER' ? 'Direct Bank Transfer' : 'Credit / Debit Card'}</strong></div>
+                            <div>Ref: <span className="text-blue-700">{activeOrder?.payment?.transactionReference || activeOrder?.transactionReference || 'PENDING-TXN'}</span></div>
+                            {activeOrder?.payment?.paymentDetails && (
+                              <div className="text-slate-500 font-sans">{activeOrder?.payment?.paymentDetails}</div>
+                            )}
+                          </div>
                         </div>
                       ) : activeOrder?.payment?.paymentStatus === 'FAILED' ? (
                         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs space-y-2">
                           <div className="flex items-center gap-1.5 font-bold text-red-900">
                             <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
-                            <span>Payment Slip Rejected by Administrator</span>
+                            <span>Payment Rejected by Administrator</span>
                           </div>
                           <p className="text-[11px] text-red-800 leading-relaxed">
-                            Reason: {activeOrder?.payment?.adminNotes || 'Verification failed. Please re-upload a valid bank deposit slip.'}
+                            Reason: {activeOrder?.payment?.adminNotes || 'Verification failed. Please resubmit your payment.'}
                           </p>
                           {onOpenPaymentModal && (
                             <button
                               onClick={() => onOpenPaymentModal(activeOrder)}
-                              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                             >
-                              <Upload className="w-4 h-4" />
-                              <span>Re-upload Bank Payment Slip</span>
+                              <CreditCard className="w-4 h-4" />
+                              <span>Resubmit Payment</span>
                             </button>
                           )}
                         </div>
                       ) : onOpenPaymentModal && (
                         <button
                           onClick={() => onOpenPaymentModal(activeOrder)}
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                         >
-                          <Upload className="w-4 h-4" />
-                          <span>Upload Bank Payment Slip</span>
+                          <CreditCard className="w-4 h-4" />
+                          <span>Complete Payment</span>
                         </button>
                       )}
                     </>

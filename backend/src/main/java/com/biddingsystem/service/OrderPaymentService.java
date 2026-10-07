@@ -2,6 +2,7 @@ package com.biddingsystem.service;
 
 import com.biddingsystem.entity.*;
 import com.biddingsystem.pattern.state.delivery.DeliveryState;
+import com.biddingsystem.pattern.strategy.payment.*;
 import com.biddingsystem.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,38 +33,52 @@ public class OrderPaymentService {
     @Autowired
     private AuditLogRepository auditLogRepo;
 
+    /**
+     * Executes payment processing using the Strategy Pattern (GoF Behavioral).
+     * Validates credentials and prepares payment details via the appropriate PaymentStrategy,
+     * sets status to PROCESSING for Administrator verification, and records delivery milestones.
+     */
     @Transactional
-    public Payment processPayment(Long orderId, String paymentMethod, String txRef) {
-        return processPayment(orderId, paymentMethod, txRef, null);
-    }
+    public Payment processPaymentWithStrategy(PaymentRequest request) {
+        if (request == null || request.getOrderId() == null) {
+            throw new IllegalArgumentException("Valid PaymentRequest with orderId is required.");
+        }
 
-    @Transactional
-    public Payment processPayment(Long orderId, String paymentMethod, String txRef, String paymentSlipUrl) {
-        WinningOrder order = orderRepo.findById(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("Winning order not found: " + orderId));
+        WinningOrder order = orderRepo.findById(request.getOrderId())
+                .orElseThrow(() -> new IllegalArgumentException("Winning order not found: " + request.getOrderId()));
 
-        String reference = (txRef != null && !txRef.trim().isEmpty()) ? txRef : "SLIP-" + System.currentTimeMillis();
+        if (request.getAmount() == null) {
+            request.setAmount(order.getWinningAmount());
+        }
 
+        // 1. Resolve strategy using PaymentStrategyFactory
+        PaymentStrategy strategy = PaymentStrategyFactory.getStrategy(request.getPaymentMethod());
+
+        // 2. Delegate execution to PaymentContext (Strategy Pattern)
+        PaymentContext context = new PaymentContext(strategy);
+        PaymentResult result = context.executePayment(request);
+
+        // 3. Persist Payment record awaiting Administrator approval
         Payment payment = new Payment();
         payment.setWinningOrder(order);
-        payment.setPaymentAmount(order.getWinningAmount());
-        payment.setPaymentMethod("PAYMENT_SLIP");
-        payment.setTransactionReference(reference);
+        payment.setPaymentAmount(result.getAmount());
+        payment.setPaymentMethod(result.getPaymentMethod());
+        payment.setTransactionReference(result.getTransactionReference());
+        payment.setPaymentDetails(result.getMaskedDetails());
         payment.setPaymentStatus(Payment.PaymentStatus.PROCESSING);
-        payment.setPaymentSlipUrl(paymentSlipUrl);
         Payment savedPayment = paymentRepo.save(payment);
 
-        // Mark order status as PROCESSING while awaiting admin verification
+        // 4. Update order status to PROCESSING awaiting admin verification
         order.setOrderStatus(WinningOrder.OrderStatus.PROCESSING);
         orderRepo.save(order);
 
-        // Record milestone on delivery record, keeping status at AWAITING_PAYMENT until Admin approves!
-        deliveryRepo.findByWinningOrder_OrderId(orderId).ifPresent(delivery -> {
+        // 5. Record milestone on delivery record, keeping status at AWAITING_PAYMENT until Admin approves
+        deliveryRepo.findByWinningOrder_OrderId(order.getOrderId()).ifPresent(delivery -> {
             delivery.setDeliveryStatus(Delivery.DeliveryStatus.AWAITING_PAYMENT);
             DeliveryMilestone milestone = new DeliveryMilestone(
                 delivery,
-                "Payment Slip Deposited",
-                "Buyer uploaded bank payment slip (" + reference + "). Awaiting Administrator review and approval.",
+                "Payment Submitted (" + strategy.getDisplayName() + ")",
+                "Buyer submitted payment details (" + result.getMaskedDetails() + "). Awaiting Administrator review and approval.",
                 "Admin Settlement Desk",
                 Delivery.DeliveryStatus.AWAITING_PAYMENT
             );
@@ -71,20 +86,39 @@ public class OrderPaymentService {
             deliveryRepo.save(delivery);
         });
 
-        // Notifications & Audit Log
+        // 6. Notifications & Audit Log
         notificationRepo.save(new Notification(
             order.getSeller(),
-            "PAYMENT_SLIP_SUBMITTED",
-            String.format("Buyer uploaded payment slip for Order #%d (Rs. %.2f). Awaiting Administrator verification.", order.getOrderId(), order.getWinningAmount())
+            "PAYMENT_SUBMITTED",
+            String.format("Buyer submitted %s payment for Order #%d (Rs. %.2f). Awaiting Administrator verification.",
+                    strategy.getDisplayName(), order.getOrderId(), order.getWinningAmount())
         ));
 
         auditLogRepo.save(new AuditLog(
             order.getBuyer(),
-            "PAYMENT_SLIP_UPLOADED",
-            String.format("Payment slip deposited for Order #%d with reference %s.", orderId, reference)
+            "PAYMENT_SUBMITTED",
+            String.format("Payment submitted via %s for Order #%d with reference %s.",
+                    strategy.getDisplayName(), order.getOrderId(), result.getTransactionReference())
         ));
 
         return savedPayment;
+    }
+
+    @Transactional
+    public Payment processPayment(Long orderId, String paymentMethod, String txRef) {
+        return processPayment(orderId, paymentMethod, txRef, null);
+    }
+
+    @Transactional
+    public Payment processPayment(Long orderId, String paymentMethod, String txRef, String paymentSlipUrl) {
+        PaymentRequest request = new PaymentRequest();
+        request.setOrderId(orderId);
+        request.setPaymentMethod(paymentMethod != null ? paymentMethod : BankTransferPaymentStrategy.METHOD_NAME);
+        request.setTransferReference(txRef);
+        request.setBankName("Direct Settlement");
+        request.setAccountNumber("0000");
+        request.setAccountHolderName("Buyer");
+        return processPaymentWithStrategy(request);
     }
 
     @Transactional
@@ -107,8 +141,8 @@ public class OrderPaymentService {
                 delivery.setCurrentLocation("Seller Logistics Facility - Packaging & Title Preparation");
                 delivery.addMilestone(new DeliveryMilestone(
                     delivery,
-                    "Payment Slip Approved by Administrator",
-                    "Administrator verified bank payment slip. Escrow cleared. Vehicle preparation and dispatch process has officially started.",
+                    "Payment Approved by Administrator",
+                    "Administrator verified and approved payment. Escrow cleared. Vehicle preparation and dispatch process has officially started.",
                     "Admin Operations Desk",
                     Delivery.DeliveryStatus.PREPARING_FOR_SHIPMENT
                 ));
@@ -119,19 +153,19 @@ public class OrderPaymentService {
             notificationRepo.save(new Notification(
                 order.getBuyer(),
                 "PAYMENT_APPROVED",
-                String.format("Your payment slip for Order #%d has been approved by Administrator! Processing and delivery have started.", order.getOrderId())
+                String.format("Your payment for Order #%d has been approved by Administrator! Vehicle preparation and delivery have started.", order.getOrderId())
             ));
 
             notificationRepo.save(new Notification(
                 order.getSeller(),
                 "PAYMENT_CONFIRMED",
-                String.format("Administrator approved payment slip for Order #%d. Please begin product processing and vehicle dispatch.", order.getOrderId())
+                String.format("Administrator approved payment for Order #%d. Please begin vehicle preparation and dispatch.", order.getOrderId())
             ));
 
             auditLogRepo.save(new AuditLog(
                 null,
                 "PAYMENT_APPROVED",
-                String.format("Administrator approved payment slip #%d for Order #%d. Product processing and delivery started.", payment.getPaymentId(), order.getOrderId())
+                String.format("Administrator approved payment #%d for Order #%d. Vehicle preparation and delivery started.", payment.getPaymentId(), order.getOrderId())
             ));
         } else {
             payment.setPaymentStatus(Payment.PaymentStatus.FAILED);
@@ -141,8 +175,8 @@ public class OrderPaymentService {
                 delivery.setDeliveryStatus(Delivery.DeliveryStatus.AWAITING_PAYMENT);
                 delivery.addMilestone(new DeliveryMilestone(
                     delivery,
-                    "Payment Slip Rejected by Administrator",
-                    "Administrator rejected payment slip: " + (notes != null && !notes.isBlank() ? notes : "Invalid or unclear deposit slip.") + ". Please upload a valid payment slip.",
+                    "Payment Rejected by Administrator",
+                    "Administrator rejected payment: " + (notes != null && !notes.isBlank() ? notes : "Verification failed.") + ". Please resubmit payment.",
                     "Admin Operations Desk",
                     Delivery.DeliveryStatus.AWAITING_PAYMENT
                 ));
@@ -152,13 +186,13 @@ public class OrderPaymentService {
             notificationRepo.save(new Notification(
                 order.getBuyer(),
                 "PAYMENT_REJECTED",
-                "Your payment slip was rejected by Administrator: " + (notes != null && !notes.isBlank() ? notes : "Invalid slip.") + ". Please re-upload a valid payment slip."
+                "Your payment was rejected by Administrator: " + (notes != null && !notes.isBlank() ? notes : "Verification failed.") + ". Please resubmit payment."
             ));
 
             auditLogRepo.save(new AuditLog(
                 null,
                 "PAYMENT_REJECTED",
-                String.format("Administrator rejected payment slip #%d for Order #%d. Reason: %s", payment.getPaymentId(), order.getOrderId(), notes)
+                String.format("Administrator rejected payment #%d for Order #%d. Reason: %s", payment.getPaymentId(), order.getOrderId(), notes)
             ));
         }
 

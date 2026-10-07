@@ -930,30 +930,37 @@ export default function App() {
     }
   };
 
-  const handleProcessPayment = async (orderId, method, txRef, slipUrl) => {
-    const slip = slipUrl || '';
-    const paymentMethod = method || 'PAYMENT_SLIP';
+  const handleProcessPayment = async (orderId, paymentData) => {
+    const payload = typeof paymentData === 'object' && paymentData !== null
+      ? { orderId, ...paymentData }
+      : { orderId, paymentMethod: paymentData || 'CREDIT_CARD' };
+
+    let createdPayment = null;
     try {
-      await fetch('/api/payments/pay', {
+      const res = await fetch('/api/payments/pay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          orderId, 
-          paymentMethod, 
-          transactionReference: txRef,
-          paymentSlipUrl: slip
-        })
+        body: JSON.stringify(payload)
       });
+      if (res.ok) {
+        createdPayment = await res.json();
+      }
     } catch (e) {
       console.warn('Backend payment pay failed, updating local state', e);
     }
+
+    const methodName = payload.paymentMethod === 'BANK_TRANSFER' ? 'Bank Transfer' : 'Credit / Debit Card';
+    const txRef = createdPayment?.transactionReference || payload.transferReference || (payload.paymentMethod === 'BANK_TRANSFER' ? 'BT-' : 'CARD-') + Date.now();
+    const details = createdPayment?.paymentDetails || (payload.paymentMethod === 'BANK_TRANSFER'
+      ? `Bank: ${payload.bankName || 'Bank'} | Acc: ****${(payload.accountNumber || '').slice(-4)}`
+      : `Card: **** **** **** ${(payload.cardNumber || '').slice(-4)} | Name: ${payload.cardHolderName || 'Cardholder'}`);
 
     setWinningOrders(prev => prev.map(o => {
       if (o.orderId === orderId) {
         const currentDel = o.delivery || {};
         const payMilestone = {
-          title: 'Bank Payment Slip Uploaded',
-          description: `Buyer deposited payment slip (Ref: ${txRef}). Awaiting Administrator verification and approval before product processing.`,
+          title: `Payment Submitted (${methodName})`,
+          description: `Buyer submitted payment (${details}). Ref: ${txRef}. Awaiting Administrator approval.`,
           location: 'Admin Settlement Desk',
           status: 'AWAITING_PAYMENT',
           timestamp: new Date().toISOString()
@@ -962,13 +969,13 @@ export default function App() {
         return {
           ...o,
           orderStatus: 'PROCESSING',
-          paymentSlipUrl: slip,
           payment: {
             paymentAmount: o.winningAmount,
-            paymentMethod: 'PAYMENT_SLIP',
+            paymentMethod: payload.paymentMethod,
             paymentStatus: 'PROCESSING',
             transactionReference: txRef,
-            paymentSlipUrl: slip
+            paymentDetails: details,
+            ...(createdPayment || {})
           },
           delivery: {
             ...currentDel,
@@ -982,7 +989,7 @@ export default function App() {
 
     if (fetchPayments) fetchPayments();
     setSelectedPaymentOrder(null);
-    showToast('Payment slip uploaded successfully! Awaiting Administrator approval.');
+    showToast('Payment submitted successfully! Awaiting Administrator approval.');
   };
 
   const handleAcknowledgePayment = async (paymentIdOrOrderId, isApproved, notes) => {
@@ -1001,10 +1008,10 @@ export default function App() {
       if (match) {
         const currentDel = o.delivery || {};
         const ackMilestone = {
-          title: isApproved ? 'Payment Slip Approved by Administrator' : 'Payment Slip Rejected by Administrator',
+          title: isApproved ? 'Payment Approved by Administrator' : 'Payment Rejected by Administrator',
           description: isApproved 
-            ? 'Administrator verified bank payment slip. Escrow cleared. Vehicle preparation and delivery process has officially started.' 
-            : `Administrator rejected payment slip: ${notes || 'Verification failed'}. Please upload a valid payment slip.`,
+            ? 'Administrator verified and approved payment. Escrow cleared. Vehicle preparation and delivery process has officially started.' 
+            : `Administrator rejected payment: ${notes || 'Verification failed'}. Please resubmit payment.`,
           location: 'Admin Operations Desk',
           status: isApproved ? 'PREPARING_FOR_SHIPMENT' : 'AWAITING_PAYMENT',
           timestamp: new Date().toISOString()
@@ -1031,7 +1038,7 @@ export default function App() {
 
     if (fetchPayments) fetchPayments();
     setSelectedPaymentOrder(null);
-    showToast(isApproved ? `Payment slip APPROVED! Processing and delivery have started.` : `Payment slip REJECTED.`);
+    showToast(isApproved ? `Payment APPROVED! Vehicle preparation and delivery started.` : `Payment REJECTED by Administrator.`);
   };
 
   const handleUpdateDelivery = async (orderId, updateData) => {
@@ -1531,16 +1538,16 @@ export default function App() {
                           <button
                             onClick={() => setSelectedPaymentOrder(order)}
                             className={`w-full font-medium text-xs px-3 py-2 rounded-lg transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
-                              (order.payment?.paymentSlipUrl || order.paymentSlipUrl)
+                              order.orderStatus === 'PROCESSING' || order.payment?.paymentStatus === 'PROCESSING'
                                 ? 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
                                 : 'bg-blue-600 hover:bg-blue-700 text-white'
                             }`}
                           >
                             <CreditCard className="w-3.5 h-3.5" />
                             <span>
-                              {(order.payment?.paymentSlipUrl || order.paymentSlipUrl)
-                                ? 'Slip Uploaded (Pending)'
-                                : 'Upload Payment Slip'}
+                              {order.orderStatus === 'PROCESSING' || order.payment?.paymentStatus === 'PROCESSING'
+                                ? 'Payment Pending Approval'
+                                : 'Pay Now'}
                             </span>
                           </button>
                         )}
@@ -1551,7 +1558,7 @@ export default function App() {
                             className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <CreditCard className="w-3.5 h-3.5" />
-                            <span>Review Payment Slip</span>
+                            <span>Review Payment</span>
                           </button>
                         )}
 

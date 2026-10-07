@@ -3,6 +3,7 @@ package com.biddingsystem.controller;
 import com.biddingsystem.entity.Delivery;
 import com.biddingsystem.entity.Payment;
 import com.biddingsystem.entity.WinningOrder;
+import com.biddingsystem.pattern.strategy.payment.PaymentRequest;
 import com.biddingsystem.repository.DeliveryRepository;
 import com.biddingsystem.repository.PaymentRepository;
 import com.biddingsystem.repository.WinningOrderRepository;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -61,14 +63,34 @@ public class OrderPaymentController {
     public ResponseEntity<?> initiatePayment(@RequestBody Map<String, Object> payload) {
         try {
             Long orderId = Long.parseLong(payload.get("orderId").toString());
-            String method = payload.get("paymentMethod") != null ? payload.get("paymentMethod").toString()
-                    : "PAYMENT_SLIP";
-            String txRef = payload.get("transactionReference") != null ? payload.get("transactionReference").toString()
-                    : "SLIP-" + System.currentTimeMillis();
-            String slipUrl = payload.get("paymentSlipUrl") != null ? payload.get("paymentSlipUrl").toString()
-                    : (payload.get("slipImage") != null ? payload.get("slipImage").toString() : null);
+            String method = payload.get("paymentMethod") != null ? payload.get("paymentMethod").toString() : "CREDIT_CARD";
 
-            Payment payment = orderPaymentService.processPayment(orderId, method, txRef, slipUrl);
+            PaymentRequest request = new PaymentRequest();
+            request.setOrderId(orderId);
+            request.setPaymentMethod(method);
+
+            if (payload.get("amount") != null) {
+                request.setAmount(new BigDecimal(payload.get("amount").toString()));
+            }
+
+            // Credit Card fields
+            if (payload.get("cardHolderName") != null) request.setCardHolderName(payload.get("cardHolderName").toString());
+            if (payload.get("cardNumber") != null) request.setCardNumber(payload.get("cardNumber").toString());
+            if (payload.get("expiryDate") != null) request.setExpiryDate(payload.get("expiryDate").toString());
+            if (payload.get("cvv") != null) request.setCvv(payload.get("cvv").toString());
+
+            // Bank Transfer fields
+            if (payload.get("bankName") != null) request.setBankName(payload.get("bankName").toString());
+            if (payload.get("accountNumber") != null) request.setAccountNumber(payload.get("accountNumber").toString());
+            if (payload.get("accountHolderName") != null) request.setAccountHolderName(payload.get("accountHolderName").toString());
+            if (payload.get("transferReference") != null) request.setTransferReference(payload.get("transferReference").toString());
+            if (payload.get("transactionReference") != null && request.getTransferReference() == null) {
+                request.setTransferReference(payload.get("transactionReference").toString());
+            }
+
+            if (payload.get("notes") != null) request.setNotes(payload.get("notes").toString());
+
+            Payment payment = orderPaymentService.processPaymentWithStrategy(request);
             return ResponseEntity.ok(payment);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
