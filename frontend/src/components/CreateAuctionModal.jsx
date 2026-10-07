@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, PlusCircle, PencilLine, Trash2, Clock, Shield, AlertCircle } from 'lucide-react';
+import { X, PlusCircle, PencilLine, Trash2, Clock, Shield, AlertCircle, Upload } from 'lucide-react';
 
 export default function CreateAuctionModal({ onClose, onCreateListing, onUpdateListing, auctionToEdit, currentUser, onDeleteListing }) {
   const emptyForm = {
@@ -44,6 +44,19 @@ export default function CreateAuctionModal({ onClose, onCreateListing, onUpdateL
 
   const [formData, setFormData] = useState(defaultForm);
   const [errorMsg, setErrorMsg] = useState('');
+  const [imageFileName, setImageFileName] = useState('');
+
+  const handleImageFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageFileName(file.name);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData((prev) => ({ ...prev, imagePath: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -250,14 +263,50 @@ export default function CreateAuctionModal({ onClose, onCreateListing, onUpdateL
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Image URL</label>
-              <input
-                type="url"
-                placeholder="https://images.unsplash.com/..."
-                value={formData.imagePath}
-                onChange={(e) => setFormData({ ...formData, imagePath: e.target.value })}
-                className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600"
-              />
+              <label className="block font-semibold text-slate-700 mb-1">Vehicle Image</label>
+              {formData.imagePath ? (
+                <div className="flex items-center gap-2 border border-slate-300 rounded-lg p-1.5 bg-slate-50 min-h-[38px]">
+                  <img
+                    src={formData.imagePath}
+                    alt="Vehicle preview"
+                    className="w-7 h-7 object-cover rounded border border-slate-200 shrink-0"
+                  />
+                  <span className="text-[11px] text-slate-700 truncate flex-1 font-medium">
+                    {imageFileName || 'Selected local image'}
+                  </span>
+                  <label className="text-[11px] text-blue-600 hover:text-blue-700 font-semibold cursor-pointer px-1.5 py-0.5 rounded hover:bg-blue-50 transition-colors shrink-0">
+                    Change
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData((prev) => ({ ...prev, imagePath: '' }));
+                      setImageFileName('');
+                    }}
+                    className="text-slate-400 hover:text-red-600 p-0.5 rounded transition-colors shrink-0"
+                    title="Remove image"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center justify-center gap-1.5 border border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 rounded-lg px-3 py-2 cursor-pointer text-slate-600 hover:text-blue-600 transition-all min-h-[38px]">
+                  <Upload className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="text-xs font-medium">Upload from local files</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageFileChange}
+                    className="hidden"
+                  />
+                </label>
+              )}
             </div>
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Mileage (KM)</label>
@@ -404,18 +453,6 @@ export default function CreateAuctionModal({ onClose, onCreateListing, onUpdateL
                 </div>
               </div>
             )}
-          </div>
-
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">Photo Image URL *</label>
-            <input
-              type="url"
-              required
-              value={formData.imagePath}
-              onChange={(e) => setFormData({ ...formData, imagePath: e.target.value })}
-              placeholder="https://images.unsplash.com/..."
-              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600"
-            />
           </div>
 
           <div>
