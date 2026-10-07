@@ -115,6 +115,7 @@ export default function AuthPortal({ onLoginSuccess }) {
   // Scroll animation visibility state
   const [aboutInView, setAboutInView] = useState(false);
   const [contactInView, setContactInView] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const aboutRef = useRef(null);
   const contactRef = useRef(null);
 
@@ -141,6 +142,16 @@ export default function AuthPortal({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Navbar sticky / blur scroll listener
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Intersection Observer for scroll animations
   useEffect(() => {
@@ -369,10 +380,75 @@ export default function AuthPortal({ onLoginSuccess }) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
       
+      {/* Top Clean Navigation Bar (Sticky / Fixed on Scroll) */}
+      <header className={`fixed top-0 left-0 right-0 z-50 px-6 sm:px-12 transition-all duration-300 flex items-center justify-between ${
+        isScrolled
+          ? 'py-3.5 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-sm'
+          : 'py-5 bg-gradient-to-b from-white/70 via-white/20 to-transparent'
+      }`}>
+        {/* Left: Brand Mark */}
+        <div className="flex items-center gap-10">
+          <div 
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="flex items-center gap-2.5 cursor-pointer select-none group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs tracking-wider shadow-sm group-hover:scale-105 transition-transform">
+              AV
+            </div>
+            <div className="leading-tight text-left">
+              <span className="font-extrabold text-lg tracking-tight text-slate-900 block font-display">
+                Avtomat
+              </span>
+              <span className="text-[10px] text-blue-600 font-bold block uppercase tracking-wider">
+                AUTO EXCHANGE
+              </span>
+            </div>
+          </div>
+
+          {/* Smooth Scroll Links (About & Contact) */}
+          <nav className="flex items-center gap-8 text-xs font-semibold text-slate-700">
+            <button 
+              type="button"
+              onClick={() => scrollToSection('about')}
+              className="hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              About Us
+            </button>
+            <button 
+              type="button"
+              onClick={() => scrollToSection('contact')}
+              className="hover:text-blue-600 transition-colors cursor-pointer"
+            >
+              Contact Us
+            </button>
+          </nav>
+        </div>
+
+        {/* Right: Login & Sign Up CTA */}
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => openAuthModal('LOGIN')}
+            className="text-xs font-bold text-slate-800 hover:text-blue-600 transition-colors px-3 py-1.5 cursor-pointer"
+          >
+            Login
+          </button>
+
+          <button
+            type="button"
+            onClick={() => openAuthModal('REGISTER')}
+            className="bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 font-bold text-xs px-5 py-2 rounded-full shadow-sm hover:shadow transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>Sign up</span>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-700" />
+          </button>
+        </div>
+      </header>
+
       {/* ========================================================================= */}
       {/* 1. HERO TOP SECTION WITH SCENIC SUV BACKDROP                             */}
       {/* ========================================================================= */}
-      <section className="relative min-h-screen flex flex-col justify-between overflow-hidden">
+      <section className="relative min-h-screen flex flex-col justify-between overflow-hidden pt-20 sm:pt-24">
         {/* Scenic Landscape Background */}
         <div 
           className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
@@ -382,69 +458,8 @@ export default function AuthPortal({ onLoginSuccess }) {
           <div className="absolute inset-0 bg-gradient-to-b from-white/70 via-white/10 to-transparent pointer-events-none" />
         </div>
 
-        {/* Top Clean Navigation Bar */}
-        <header className="relative z-20 px-6 sm:px-12 py-5 flex items-center justify-between">
-          {/* Left: Brand Mark */}
-          <div className="flex items-center gap-10">
-            <div 
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="flex items-center gap-2.5 cursor-pointer select-none group"
-            >
-              <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs tracking-wider shadow-sm group-hover:scale-105 transition-transform">
-                AV
-              </div>
-              <div className="leading-tight text-left">
-                <span className="font-extrabold text-lg tracking-tight text-slate-900 block font-display">
-                  Avtomat
-                </span>
-                <span className="text-[10px] text-blue-600 font-bold block uppercase tracking-wider">
-                  AUTO EXCHANGE
-                </span>
-              </div>
-            </div>
-
-            {/* Smooth Scroll Links (About & Contact) */}
-            <nav className="flex items-center gap-8 text-xs font-semibold text-slate-700">
-              <button 
-                type="button"
-                onClick={() => scrollToSection('about')}
-                className="hover:text-blue-600 transition-colors cursor-pointer"
-              >
-                About Us
-              </button>
-              <button 
-                type="button"
-                onClick={() => scrollToSection('contact')}
-                className="hover:text-blue-600 transition-colors cursor-pointer"
-              >
-                Contact Us
-              </button>
-            </nav>
-          </div>
-
-          {/* Right: Login & Sign Up CTA */}
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => openAuthModal('LOGIN')}
-              className="text-xs font-bold text-slate-800 hover:text-blue-600 transition-colors px-3 py-1.5 cursor-pointer"
-            >
-              Login
-            </button>
-
-            <button
-              type="button"
-              onClick={() => openAuthModal('REGISTER')}
-              className="bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 font-bold text-xs px-5 py-2 rounded-full shadow-sm hover:shadow transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>Sign up</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-700" />
-            </button>
-          </div>
-        </header>
-
         {/* Hero Content Body */}
-        <div className="relative z-10 px-6 sm:px-12 pt-8 sm:pt-12 pb-16 max-w-7xl mx-auto w-full flex-1 flex flex-col justify-between">
+        <div className="relative z-10 px-6 sm:px-12 pt-4 sm:pt-6 pb-16 max-w-7xl mx-auto w-full flex-1 flex flex-col justify-between">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
             {/* Left Column: Bold Headline & CTA */}
@@ -559,7 +574,7 @@ export default function AuthPortal({ onLoginSuccess }) {
       <section 
         id="about" 
         ref={aboutRef}
-        className="py-24 px-6 sm:px-12 bg-white border-t border-slate-100"
+        className="py-24 px-6 sm:px-12 bg-white border-t border-slate-100 scroll-mt-16"
       >
         <div className="max-w-6xl mx-auto space-y-16">
           
@@ -691,7 +706,7 @@ export default function AuthPortal({ onLoginSuccess }) {
       <section 
         id="contact" 
         ref={contactRef}
-        className="py-24 px-6 sm:px-12 bg-slate-50 border-t border-slate-200/80"
+        className="py-24 px-6 sm:px-12 bg-slate-50 border-t border-slate-200/80 scroll-mt-16"
       >
         <div className="max-w-5xl mx-auto space-y-12">
           
