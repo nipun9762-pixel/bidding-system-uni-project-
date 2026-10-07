@@ -203,6 +203,22 @@ export default function App() {
     }
   }, [currentRole, activeTab]);
 
+  const [auctions, setAuctions] = useState(MOCK_AUCTIONS);
+
+  const fetchAuctions = async () => {
+    try {
+      const res = await fetch('/api/auctions');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data) && data.length > 0) {
+          setAuctions(data);
+        }
+      }
+    } catch (e) {
+      console.log('Using local state for live auction interactive demo.', e);
+    }
+  };
+
   const handleLoginSuccess = (userOrData) => {
     const user = userOrData?.user ? userOrData.user : userOrData;
     setCurrentUser(user);
@@ -215,6 +231,7 @@ export default function App() {
     } else {
       setActiveTab('bidding');
     }
+    fetchAuctions();
     fetchOrdersAndDeliveries();
     showToast(`Welcome, ${user?.firstName || 'User'}! Logged in as ${user?.role || 'BUYER'}.`);
   };
@@ -224,10 +241,9 @@ export default function App() {
     localStorage.removeItem('bidding_auth_user');
     setSellerStatusFilter('ALL');
     setActiveTab('bidding');
+    fetchAuctions();
     showToast('Signed out of Avtomat Bidding System.');
   };
-
-  const [auctions, setAuctions] = useState(MOCK_AUCTIONS);
   const [watchlist, setWatchlist] = useState([]);
   const [winningOrders, setWinningOrders] = useState([
     {
@@ -403,13 +419,7 @@ export default function App() {
 
   // Fetch initial data from backend API
   useEffect(() => {
-    fetch('/api/auctions')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data && data.length > 0) setAuctions(data);
-      })
-      .catch(() => console.log('Using local state for live auction interactive demo.'));
-
+    fetchAuctions();
     fetchOrdersAndDeliveries();
     fetchPayments();
 
@@ -435,10 +445,12 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // Re-fetch orders whenever user navigates to Winning Orders or Tracking portal
+  // Re-fetch orders and auctions whenever user navigates tabs
   useEffect(() => {
     if (activeTab === 'orders' || activeTab === 'tracking') {
       fetchOrdersAndDeliveries();
+    } else {
+      fetchAuctions();
     }
   }, [activeTab]);
 
@@ -503,6 +515,7 @@ export default function App() {
 
     const interval = setInterval(() => {
       checkExpirations();
+      fetchAuctions();
       fetchOrdersAndDeliveries();
     }, 15000);
     return () => clearInterval(interval);
@@ -537,6 +550,10 @@ export default function App() {
     if (activeTab === 'bidding') {
       // In live dealer bidding, only approved ACTIVE auctions are shown
       if (a.status !== 'ACTIVE') return false;
+    }
+
+    if (activeTab === 'watchlist') {
+      if (!watchlist.includes(a.auctionId)) return false;
     }
 
     if (activeTab === 'sold') {
@@ -743,8 +760,9 @@ export default function App() {
       });
       if (res.ok) {
         const saved = await res.json();
-        setAuctions(prev => [saved, ...prev]);
+        setAuctions(prev => [saved, ...prev.filter(a => Number(a.auctionId) !== Number(saved.auctionId))]);
         setShowCreateModal(false);
+        fetchAuctions();
         if (saved.status === 'PENDING_APPROVAL') {
           showToast('Auction listing submitted! Awaiting administrator approval before going live.');
         } else {
@@ -1136,15 +1154,17 @@ export default function App() {
 
   // Feature 02: Admin Moderate Listing (Approve / Reject)
   const handleModerateListing = async (auctionId, action) => {
+    const numericId = Number(auctionId);
     try {
       const res = await fetch('/api/admin/moderate-listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auctionId, action })
+        body: JSON.stringify({ auctionId: numericId, action })
       });
       if (res.ok) {
         const saved = await res.json();
-        setAuctions(prev => prev.map(a => a.auctionId === auctionId ? saved : a));
+        setAuctions(prev => prev.map(a => Number(a.auctionId) === numericId ? saved : a));
+        await fetchAuctions();
         showToast(action === 'APPROVE' ? `Auction #${auctionId} APPROVED & ACTIVATED for buyers!` : `Auction #${auctionId} REJECTED.`);
         return;
       }
@@ -1153,7 +1173,7 @@ export default function App() {
     }
 
     setAuctions(prev => prev.map(a => {
-      if (a.auctionId === auctionId) {
+      if (Number(a.auctionId) === numericId) {
         const isApprove = action === 'APPROVE';
         const now = new Date();
         const duration = a.durationHours || 120;

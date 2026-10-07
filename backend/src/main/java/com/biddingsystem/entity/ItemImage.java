@@ -17,7 +17,7 @@ public class ItemImage {
     @JsonIgnore
     private AuctionListing auctionListing;
 
-    @Column(nullable = false, length = 500)
+    @Column(columnDefinition = "LONGTEXT")
     private String imagePath;
 
     private LocalDateTime uploadDate = LocalDateTime.now();

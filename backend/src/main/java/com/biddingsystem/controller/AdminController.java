@@ -4,8 +4,10 @@ import com.biddingsystem.entity.AuditLog;
 import com.biddingsystem.entity.AuctionListing;
 import com.biddingsystem.repository.AuditLogRepository;
 import com.biddingsystem.repository.AuctionListingRepository;
+import com.biddingsystem.repository.ItemImageRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +22,9 @@ public class AdminController {
     private AuctionListingRepository auctionRepo;
 
     @Autowired
+    private ItemImageRepository imageRepo;
+
+    @Autowired
     private AuditLogRepository auditLogRepo;
 
     @GetMapping("/audit-logs")
@@ -28,13 +33,14 @@ public class AdminController {
     }
 
     @PostMapping("/moderate-listing")
+    @Transactional
     public ResponseEntity<?> moderateListing(@RequestBody Map<String, Object> payload) {
         try {
             Long auctionId = Long.parseLong(payload.get("auctionId").toString());
             String action = payload.get("action").toString(); // APPROVE, REJECT, SUSPEND
 
             AuctionListing auction = auctionRepo.findById(auctionId)
-                    .orElseThrow(() -> new IllegalArgumentException("Auction not found"));
+                    .orElseThrow(() -> new IllegalArgumentException("Auction not found with ID: " + auctionId));
 
             if ("APPROVE".equalsIgnoreCase(action)) {
                 auction.setStatus(AuctionListing.AuctionStatus.ACTIVE);
@@ -47,6 +53,9 @@ public class AdminController {
             }
 
             AuctionListing saved = auctionRepo.save(auction);
+            // Ensure images are retained in response
+            saved.setItemImages(imageRepo.findByAuctionListing_AuctionId(auctionId));
+
             auditLogRepo.save(new AuditLog(null, "ADMIN_MODERATION", "Admin executed action " + action + " on Auction #" + auctionId + " (Status: " + saved.getStatus() + ")"));
 
             return ResponseEntity.ok(saved);

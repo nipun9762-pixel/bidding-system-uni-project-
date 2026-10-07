@@ -14,9 +14,9 @@ export default function AuctionCard({
   onEndAuction,
   onViewOrders
 }) {
-  const image = auction.itemImages && auction.itemImages.length > 0 
-    ? auction.itemImages[0].imagePath 
-    : 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=800&q=80';
+  const image = (auction.itemImages && auction.itemImages.length > 0 ? auction.itemImages[0].imagePath : null)
+    || auction.imagePath 
+    || 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=800&q=80';
 
   const currentUserId = currentUser?.userId || currentUser?.id;
   const sellerId = auction.seller?.userId || auction.seller?.id;
